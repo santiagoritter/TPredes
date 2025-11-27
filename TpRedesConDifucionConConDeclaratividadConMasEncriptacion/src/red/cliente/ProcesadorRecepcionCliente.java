@@ -8,17 +8,19 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.file.Path;
-import java.security.PrivateKey;
+import java.security.PublicKey;
 
 public class ProcesadorRecepcionCliente implements Runnable {
 
     private final Socket socket;
-    private final PrivateKey clavePrivada;
+    private final SecretKey claveSesion;
+    private final PublicKey clavePublicaServidor;
     private final Path carpetaRecibidos;
 
-    public ProcesadorRecepcionCliente(Socket socket, PrivateKey clavePrivada, Path carpetaRecibidos) {
+    public ProcesadorRecepcionCliente(Socket socket, SecretKey claveSesion, PublicKey clavePublicaServidor, Path carpetaRecibidos) {
         this.socket = socket;
-        this.clavePrivada = clavePrivada;
+        this.claveSesion = claveSesion;
+        this.clavePublicaServidor = clavePublicaServidor;
         this.carpetaRecibidos = carpetaRecibidos;
     }
 
@@ -28,26 +30,34 @@ public class ProcesadorRecepcionCliente implements Runnable {
             String emisor = entrada.readUTF();
             String nombreArchivo = entrada.readUTF();
 
-            int longitudClave = entrada.readInt();
-            byte[] claveAESEncriptada = new byte[longitudClave];
-            entrada.readFully(claveAESEncriptada);
+            // 1. Recibir Firma Digital del Servidor
+            int lenFirma = entrada.readInt();
+            byte[] firmaServidor = new byte[lenFirma];
+            entrada.readFully(firmaServidor);
 
+            // 2. Recibir Archivo Encriptado
             long tamanoArchivo = entrada.readLong();
             byte[] archivoEncriptado = new byte[(int) tamanoArchivo];
             entrada.readFully(archivoEncriptado);
 
-            byte[] claveAESBytes = CriptografiaUtil.desencriptarRSA(claveAESEncriptada, clavePrivada);
-            SecretKey claveAES = CriptografiaUtil.convertirBytesAClaveAES(claveAESBytes);
+            // 3. Verificar Firma
+            boolean firmaValida = CriptografiaUtil.verificarFirma(archivoEncriptado, firmaServidor, clavePublicaServidor);
 
-            byte[] archivoDesencriptado = CriptografiaUtil.desencriptarAESConIV(archivoEncriptado, claveAES);
+            if (!firmaValida) {
+                System.err.println("ALERTA DE SEGURIDAD: Firma del servidor inválida para " + nombreArchivo);
+                return;
+            }
+
+            // 4. Desencriptar con Clave de Sesión (AES)
+            byte[] archivoDesencriptado = CriptografiaUtil.desencriptarAESConIV(archivoEncriptado, claveSesion);
 
             Path rutaSalida = carpetaRecibidos.resolve(nombreArchivo);
             ArchivoUtil.escribirArchivo(rutaSalida, archivoDesencriptado);
 
-            System.out.println("Archivo recibido de " + emisor + ": " + nombreArchivo);
+            System.out.println("Archivo recibido y verificado: " + nombreArchivo + " (De: " + emisor + ")");
 
         } catch (Exception e) {
-            System.err.println("Error recibiendo: " + e.getMessage());
+            System.err.println("Error recibiendo archivo: " + e.getMessage());
         } finally {
             try {
                 socket.close();

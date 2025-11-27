@@ -73,6 +73,20 @@ public final class CriptografiaUtil {
         return cipher.doFinal(datosEncriptados);
     }
 
+    public static byte[] firmar(byte[] datos, PrivateKey clavePrivada) throws Exception {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initSign(clavePrivada);
+        signature.update(datos);
+        return signature.sign();
+    }
+
+    public static boolean verificarFirma(byte[] datos, byte[] firma, PublicKey clavePublica) throws Exception {
+        Signature signature = Signature.getInstance("SHA256withRSA");
+        signature.initVerify(clavePublica);
+        signature.update(datos);
+        return signature.verify(firma);
+    }
+
     public static SecretKey convertirBytesAClaveAES(byte[] bytesClave) {
         return new SecretKeySpec(bytesClave, 0, bytesClave.length, Constantes.ALGORITMO_AES);
     }

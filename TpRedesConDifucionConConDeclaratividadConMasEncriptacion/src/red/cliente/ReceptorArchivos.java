@@ -1,20 +1,23 @@
 package red.cliente;
 
+import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Path;
-import java.security.PrivateKey;
+import java.security.PublicKey;
 
 public class ReceptorArchivos implements Runnable {
 
     private final int puerto;
-    private final PrivateKey clavePrivada;
+    private final SecretKey claveSesion;
+    private final PublicKey clavePublicaServidor;
     private final Path carpetaRecibidos;
 
-    public ReceptorArchivos(int puerto, PrivateKey clavePrivada, Path carpetaRecibidos) {
+    public ReceptorArchivos(int puerto, SecretKey claveSesion, PublicKey clavePublicaServidor, Path carpetaRecibidos) {
         this.puerto = puerto;
-        this.clavePrivada = clavePrivada;
+        this.claveSesion = claveSesion;
+        this.clavePublicaServidor = clavePublicaServidor;
         this.carpetaRecibidos = carpetaRecibidos;
     }
 
@@ -24,7 +27,7 @@ public class ReceptorArchivos implements Runnable {
             System.out.println("Receptor activo en puerto " + puerto);
             while (true) {
                 Socket clienteSocket = servidor.accept();
-                ProcesadorRecepcionCliente procesador = new ProcesadorRecepcionCliente(clienteSocket, clavePrivada, carpetaRecibidos);
+                ProcesadorRecepcionCliente procesador = new ProcesadorRecepcionCliente(clienteSocket, claveSesion, clavePublicaServidor, carpetaRecibidos);
                 new Thread(procesador).start();
             }
         } catch (IOException e) {
